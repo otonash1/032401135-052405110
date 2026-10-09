@@ -24,10 +24,12 @@
 
   /* ---------- 页面状态 ---------- */
   const state = {
-    route: 'home',   /* 当前页面 */
-    params: {},      /* 当前页面参数（如详情页的 id） */
-    nav: [],         /* 历史栈，供返回使用 */
-    homeType: 'all'  /* 首页类型筛选：all / lost / found */
+    route: 'home',        /* 当前页面 */
+    params: {},           /* 当前页面参数（如详情页的 id） */
+    nav: [],              /* 历史栈，供返回使用 */
+    homeType: 'all',      /* 首页类型筛选：all / lost / found */
+    publishType: 'lost',  /* 发布表单当前选中的类型 */
+    lastPublishedId: ''   /* 刚发布成功的信息编号，供成功页跳详情 */
   };
 
   /* ================= 公共渲染片段 ================= */
@@ -108,10 +110,79 @@
       '<div class="list">' + (list.map(itemCard).join('') || empty('暂时还没有信息')) + '</div>';
   }
 
+  /* ================= 页面：发布信息 ================= */
+
+  /** 一个带标签、输入控件与错误提示的字段块 */
+  function field(key, label, control, required) {
+    return '' +
+      '<div class="field" data-field="' + key + '">' +
+        '<div class="label">' + label + (required ? ' <span class="req">*</span>' : '') + '</div>' +
+        control +
+        '<div class="err"></div>' +
+      '</div>';
+  }
+
+  function renderPublish() {
+    if (state.params.type === 'lost' || state.params.type === 'found') {
+      state.publishType = state.params.type;
+    }
+    state.params = {};
+
+    const isLost = state.publishType === 'lost';
+    const segLost = '<div class="seg' + (isLost ? ' on' : '') + '" data-action="seg" data-type="lost">发布寻物</div>';
+    const segFound = '<div class="seg' + (!isLost ? ' on' : '') + '" data-action="seg" data-type="found">发布招领</div>';
+
+    const cateOptions = seed.CATEGORIES.map(function (c) {
+      return '<option value="' + utils.escapeHtml(c) + '">' + utils.escapeHtml(c) + '</option>';
+    }).join('');
+
+    return '' +
+      navbar('发布信息') +
+      '<div class="form">' +
+        '<div class="segment">' + segLost + segFound + '</div>' +
+        field('name', '物品名称',
+          '<input id="f-name" maxlength="30" placeholder="例如：黑色雨伞 / 一卡通">', true) +
+        field('cate', '物品类别',
+          '<select id="f-cate">' + cateOptions + '</select>', true) +
+        field('place', '<span id="lbl-place">' + (isLost ? '丢失地点' : '拾获地点') + '</span>',
+          '<input id="f-place" maxlength="40" placeholder="例如：紫金楼 302 教室 / 三区食堂二楼">', true) +
+        field('time', '<span id="lbl-time">' + (isLost ? '丢失时间' : '拾获时间') + '</span>',
+          '<input id="f-time" maxlength="40" placeholder="例如：2026-09-24 下午 3 点左右">', true) +
+        field('desc', '补充描述',
+          '<textarea id="f-desc" maxlength="200" placeholder="颜色、特征、有无姓名贴等，描述越详细越容易被认出来"></textarea>', false) +
+        field('contact', '联系方式',
+          '<input id="f-contact" maxlength="40" placeholder="微信号 / QQ / 手机号（仅对方点击后可见）">', true) +
+        '<div class="tips">发布后可在「我的发布」中修改状态为「已完成」，或编辑、删除。</div>' +
+        '<button class="btn btn-main" data-action="submit">发布</button>' +
+      '</div>';
+  }
+
+  /* ================= 页面：发布成功 ================= */
+
+  function renderSuccess() {
+    const isLost = state.publishType === 'lost';
+    const tip = isLost
+      ? '你的寻物信息已经发布啦<br>有线索的同学可以通过详情页联系你'
+      : '你的招领信息已经发布啦<br>谢谢你的热心，失主可以联系你认领';
+    return '' +
+      '<div class="result">' +
+        '<div class="circle">✓</div>' +
+        '<h3>发布成功</h3>' +
+        '<p>' + tip + '</p>' +
+        '<div class="acts">' +
+          '<button class="btn btn-main" data-action="success-detail">查看详情</button>' +
+          '<button class="btn btn-ghost" data-action="success-again">继续发布</button>' +
+          '<button class="btn btn-ghost" data-action="tab" data-route="home">返回首页</button>' +
+        '</div>' +
+      '</div>';
+  }
+
   /* ================= 路由 ================= */
 
   const PAGES = {
-    home: renderHome
+    home: renderHome,
+    publish: renderPublish,
+    success: renderSuccess
   };
 
   function navigate(entry, push) {
@@ -160,12 +231,89 @@
     if (action === 'publish') { go('publish', { type: type }); return; }
     if (action === 'detail') { go('detail', { id: el.getAttribute('data-id') }); return; }
     if (action === 'home-type') { state.homeType = type; render(); return; }
+    if (action === 'seg') { setPublishType(type); return; }
+    if (action === 'submit') { submitPublish(); return; }
+    if (action === 'success-detail') { go('detail', { id: state.lastPublishedId }); return; }
+    if (action === 'success-again') { go('publish', { type: state.publishType }); return; }
+  }
+
+  /** 输入时清掉该字段的错误提示 */
+  function handleInput(e) {
+    const box = e.target.closest ? e.target.closest('[data-field]') : null;
+    if (!box) return;
+    box.classList.remove('invalid');
+    const err = box.querySelector('.err');
+    if (err) err.textContent = '';
+  }
+
+  /** 切换「寻物 / 招领」，同步分段按钮与地点、时间的措辞 */
+  function setPublishType(type) {
+    state.publishType = type === 'found' ? 'found' : 'lost';
+    const segs = document.querySelectorAll('.segment .seg');
+    for (let i = 0; i < segs.length; i++) {
+      segs[i].classList.toggle('on', segs[i].getAttribute('data-type') === state.publishType);
+    }
+    const lp = $('lbl-place');
+    const lt = $('lbl-time');
+    if (lp) lp.textContent = state.publishType === 'lost' ? '丢失地点' : '拾获地点';
+    if (lt) lt.textContent = state.publishType === 'lost' ? '丢失时间' : '拾获时间';
+  }
+
+  /** 收集表单内容 */
+  function readDraft() {
+    const val = function (id) { const el = $(id); return el ? el.value : ''; };
+    return {
+      type: state.publishType,
+      name: val('f-name'),
+      cate: val('f-cate'),
+      place: val('f-place'),
+      time: val('f-time'),
+      desc: val('f-desc'),
+      contact: val('f-contact')
+    };
+  }
+
+  /** 把校验结果标到对应字段上 */
+  function showErrors(errors) {
+    const keys = Object.keys(errors);
+    const boxes = document.querySelectorAll('.form .field');
+    for (let i = 0; i < boxes.length; i++) {
+      const key = boxes[i].getAttribute('data-field');
+      const err = boxes[i].querySelector('.err');
+      if (Object.prototype.hasOwnProperty.call(errors, key)) {
+        boxes[i].classList.add('invalid');
+        if (err) err.textContent = errors[key];
+      } else {
+        boxes[i].classList.remove('invalid');
+        if (err) err.textContent = '';
+      }
+    }
+    /* 滚动到第一个出错的字段 */
+    if (keys.length) {
+      const first = document.querySelector('.form .field[data-field="' + keys[0] + '"]');
+      if (first && first.scrollIntoView) first.scrollIntoView({ block: 'center' });
+    }
+  }
+
+  /** 提交发布 */
+  function submitPublish() {
+    const draft = readDraft();
+    const result = LF.validate.validateDraft(draft);
+    if (!result.ok) {
+      showErrors(result.errors);
+      toast('还有信息没填好，请检查标红的字段');
+      return;
+    }
+    const item = store.add(LF.validate.normalizeDraft(draft));
+    state.lastPublishedId = item.id;
+    go('success');
   }
 
   /* ================= 初始化 ================= */
 
   function init() {
     document.addEventListener('click', handleClick);
+    document.addEventListener('input', handleInput);
     render();
   }
 

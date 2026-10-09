@@ -29,7 +29,9 @@
     nav: [],              /* 历史栈，供返回使用 */
     homeType: 'all',      /* 首页类型筛选：all / lost / found */
     publishType: 'lost',  /* 发布表单当前选中的类型 */
-    lastPublishedId: ''   /* 刚发布成功的信息编号，供成功页跳详情 */
+    lastPublishedId: '',  /* 刚发布成功的信息编号，供成功页跳详情 */
+    searchKw: '',         /* 搜索页当前关键词 */
+    searchFilter: 'all'   /* 搜索结果的筛选：all / lost / found / done */
   };
 
   /* ================= 公共渲染片段 ================= */
@@ -177,12 +179,47 @@
       '</div>';
   }
 
+  /* ================= 页面：搜索 ================= */
+
+  function renderSearch() {
+    const hotWords = ['校园卡', '钥匙', '雨伞', '耳机', '水杯', '充电宝'];
+    const quickWords = ['紫金楼', '图书馆', '三区食堂', '一区宿舍'];
+    const kwTag = function (word) {
+      return '<span data-action="quick-kw" data-kw="' + utils.escapeHtml(word) + '">' + utils.escapeHtml(word) + '</span>';
+    };
+
+    const filterChips = [['all', '全部'], ['lost', '寻物'], ['found', '招领'], ['done', '已完成']].map(function (pair) {
+      const on = state.searchFilter === pair[0];
+      return '<div class="chip' + (on ? ' on' : '') + '" data-action="s-filter" data-type="' + pair[0] + '">' + pair[1] + '</div>';
+    }).join('');
+
+    const hasKw = state.searchKw.trim() !== '';
+
+    return '' +
+      '<div class="search-head">' +
+        '<div class="box"><span>🔍</span>' +
+          '<input id="kw" maxlength="30" placeholder="输入物品名称 / 关键词" value="' + utils.escapeHtml(state.searchKw) + '">' +
+        '</div>' +
+        '<div class="cancel" data-action="tab" data-route="home">取消</div>' +
+      '</div>' +
+      '<div id="search-hot"' + (hasKw ? ' style="display:none"' : '') + '>' +
+        '<div class="sec"><div class="sec-title">热门搜索</div><div class="kw">' + hotWords.map(kwTag).join('') + '</div></div>' +
+        '<div class="sec"><div class="sec-title">快捷筛选</div><div class="kw">' + quickWords.map(kwTag).join('') + '</div></div>' +
+      '</div>' +
+      '<div id="search-result"' + (hasKw ? '' : ' style="display:none"') + '>' +
+        '<div class="filter-row">' + filterChips + '</div>' +
+        '<div class="res-head" id="res-head"></div>' +
+        '<div class="list" id="res-list"></div>' +
+      '</div>';
+  }
+
   /* ================= 路由 ================= */
 
   const PAGES = {
     home: renderHome,
     publish: renderPublish,
-    success: renderSuccess
+    success: renderSuccess,
+    search: renderSearch
   };
 
   function navigate(entry, push) {
@@ -206,6 +243,9 @@
     const fn = PAGES[state.route];
     page.innerHTML = fn ? fn() : empty('该页面仍在开发中……');
     page.scrollTop = 0;
+
+    /* 搜索页：渲染后按当前关键词填充结果区 */
+    if (state.route === 'search') doSearch();
 
     /* 底部标签栏：详情、成功页隐藏 */
     const tabbar = $('tabbar');
@@ -235,10 +275,13 @@
     if (action === 'submit') { submitPublish(); return; }
     if (action === 'success-detail') { go('detail', { id: state.lastPublishedId }); return; }
     if (action === 'success-again') { go('publish', { type: state.publishType }); return; }
+    if (action === 'quick-kw') { quickKw(el.getAttribute('data-kw')); return; }
+    if (action === 's-filter') { setSFilter(type); return; }
   }
 
-  /** 输入时清掉该字段的错误提示 */
+  /** 输入时清掉该字段的错误提示；搜索框则实时检索 */
   function handleInput(e) {
+    if (e.target && e.target.id === 'kw') { doSearch(); return; }
     const box = e.target.closest ? e.target.closest('[data-field]') : null;
     if (!box) return;
     box.classList.remove('invalid');
@@ -307,6 +350,54 @@
     const item = store.add(LF.validate.normalizeDraft(draft));
     state.lastPublishedId = item.id;
     go('success');
+  }
+
+  /* ================= 搜索逻辑 ================= */
+
+  /** 按当前关键词与筛选更新搜索结果区；只改局部，保持输入框焦点 */
+  function doSearch() {
+    const input = $('kw');
+    if (!input) return;
+    const kw = input.value.trim();
+    state.searchKw = kw;
+
+    const hot = $('search-hot');
+    const res = $('search-result');
+    if (!kw) {
+      if (hot) hot.style.display = 'block';
+      if (res) res.style.display = 'none';
+      return;
+    }
+    if (hot) hot.style.display = 'none';
+    if (res) res.style.display = 'block';
+
+    let list = LF.search.searchItems(store.list(), kw);
+    if (state.searchFilter === 'done') list = LF.search.filterByStatus(list, 'done');
+    else if (state.searchFilter !== 'all') list = LF.search.filterByType(list, state.searchFilter);
+    list = LF.search.sortByTimeDesc(list);
+
+    const head = $('res-head');
+    if (head) head.textContent = '找到 ' + list.length + ' 条与「' + kw + '」相关的信息';
+    const box = $('res-list');
+    if (box) box.innerHTML = list.map(itemCard).join('') || empty('没有找到相关信息，换个关键词试试');
+  }
+
+  /** 点热门 / 快捷词：填进输入框并立即搜索 */
+  function quickKw(kw) {
+    const input = $('kw');
+    if (input) input.value = kw;
+    state.searchKw = kw;
+    doSearch();
+  }
+
+  /** 搜索结果筛选：all / lost / found / done */
+  function setSFilter(filter) {
+    state.searchFilter = filter;
+    const chips = document.querySelectorAll('.filter-row .chip');
+    for (let i = 0; i < chips.length; i++) {
+      chips[i].classList.toggle('on', chips[i].getAttribute('data-type') === filter);
+    }
+    doSearch();
   }
 
   /* ================= 初始化 ================= */

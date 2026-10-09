@@ -10,16 +10,26 @@
 
 <div class="app">
 
-  <header class="topbar">
-    <h1 class="topbar-title">校园失物招领</h1>
-    <p class="topbar-sub">找东西 · 还东西 · 一个信息池</p>
-  </header>
+  <main class="page" id="page"></main>
 
-  <main class="page" id="page">
-    <div class="empty">项目骨架已就绪，功能开发中……</div>
-  </main>
+  <nav class="tabbar" id="tabbar">
+    <button class="tab" data-action="tab" data-route="home"><span class="ico">🏠</span>首页</button>
+    <button class="tab" data-action="tab" data-route="publish"><span class="ico">➕</span>发布</button>
+    <button class="tab" data-action="tab" data-route="mine"><span class="ico">👤</span>我的发布</button>
+  </nav>
+
+  <div class="toast" id="toast"></div>
 
 </div>
+
+<!-- 核心逻辑模块（纯逻辑，可被单元测试覆盖） -->
+<script src="js/utils.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/validate.js"></script>
+<script src="js/search.js"></script>
+<script src="js/store.js"></script>
+<!-- 界面与交互 -->
+<script src="js/ui.js"></script>
 
 </body>
 </html>

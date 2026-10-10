@@ -29,6 +29,7 @@
     nav: [],              /* 历史栈，供返回使用 */
     homeType: 'all',      /* 首页类型筛选：all / lost / found */
     publishType: 'lost',  /* 发布表单当前选中的类型 */
+    editId: '',           /* 编辑模式下的信息编号（空表示新建） */
     lastPublishedId: '',  /* 刚发布成功的信息编号，供成功页跳详情 */
     searchKw: '',         /* 搜索页当前关键词 */
     searchFilter: 'all'   /* 搜索结果的筛选：all / lost / found / done */
@@ -125,8 +126,15 @@
   }
 
   function renderPublish() {
-    if (state.params.type === 'lost' || state.params.type === 'found') {
-      state.publishType = state.params.type;
+    const editing = state.params.editId ? store.get(state.params.editId) : null;
+    if (editing) {
+      state.editId = editing.id;
+      state.publishType = editing.type;
+    } else {
+      state.editId = '';
+      if (state.params.type === 'lost' || state.params.type === 'found') {
+        state.publishType = state.params.type;
+      }
     }
     state.params = {};
 
@@ -135,27 +143,30 @@
     const segFound = '<div class="seg' + (!isLost ? ' on' : '') + '" data-action="seg" data-type="found">发布招领</div>';
 
     const cateOptions = seed.CATEGORIES.map(function (c) {
-      return '<option value="' + utils.escapeHtml(c) + '">' + utils.escapeHtml(c) + '</option>';
+      const sel = editing && editing.cate === c ? ' selected' : '';
+      return '<option value="' + utils.escapeHtml(c) + '"' + sel + '>' + utils.escapeHtml(c) + '</option>';
     }).join('');
 
+    const v = function (key) { return editing ? utils.escapeHtml(editing[key]) : ''; };
+
     return '' +
-      navbar('发布信息') +
+      navbar(editing ? '编辑信息' : '发布信息') +
       '<div class="form">' +
         '<div class="segment">' + segLost + segFound + '</div>' +
         field('name', '物品名称',
-          '<input id="f-name" maxlength="30" placeholder="例如：黑色雨伞 / 一卡通">', true) +
+          '<input id="f-name" maxlength="30" placeholder="例如：黑色雨伞 / 一卡通" value="' + v('name') + '">', true) +
         field('cate', '物品类别',
           '<select id="f-cate">' + cateOptions + '</select>', true) +
         field('place', '<span id="lbl-place">' + (isLost ? '丢失地点' : '拾获地点') + '</span>',
-          '<input id="f-place" maxlength="40" placeholder="例如：紫金楼 302 教室 / 三区食堂二楼">', true) +
+          '<input id="f-place" maxlength="40" placeholder="例如：紫金楼 302 教室 / 三区食堂二楼" value="' + v('place') + '">', true) +
         field('time', '<span id="lbl-time">' + (isLost ? '丢失时间' : '拾获时间') + '</span>',
-          '<input id="f-time" maxlength="40" placeholder="例如：2026-09-24 下午 3 点左右">', true) +
+          '<input id="f-time" maxlength="40" placeholder="例如：2026-09-24 下午 3 点左右" value="' + v('time') + '">', true) +
         field('desc', '补充描述',
-          '<textarea id="f-desc" maxlength="200" placeholder="颜色、特征、有无姓名贴等，描述越详细越容易被认出来"></textarea>', false) +
+          '<textarea id="f-desc" maxlength="200" placeholder="颜色、特征、有无姓名贴等，描述越详细越容易被认出来">' + v('desc') + '</textarea>', false) +
         field('contact', '联系方式',
-          '<input id="f-contact" maxlength="40" placeholder="微信号 / QQ / 手机号（仅对方点击后可见）">', true) +
+          '<input id="f-contact" maxlength="40" placeholder="微信号 / QQ / 手机号（仅对方点击后可见）" value="' + v('contact') + '">', true) +
         '<div class="tips">发布后可在「我的发布」中修改状态为「已完成」，或编辑、删除。</div>' +
-        '<button class="btn btn-main" data-action="submit">发布</button>' +
+        '<button class="btn btn-main" data-action="submit">' + (editing ? '保存修改' : '发布') + '</button>' +
       '</div>';
   }
 
@@ -260,6 +271,45 @@
       '</div>';
   }
 
+  /* ================= 页面：我的发布 ================= */
+
+  function renderMine() {
+    const me = seed.CURRENT_USER;
+    const list = search.sortByTimeDesc(store.listMine());
+
+    const items = list.map(function (item) {
+      const done = item.status === 'done';
+      const id = utils.escapeHtml(item.id);
+      return '' +
+        '<div class="my-item">' +
+          '<div class="top">' +
+            '<span class="tag ' + item.type + '">' + (item.type === 'lost' ? '寻物' : '招领') + '</span>' +
+            '<span class="name">' + utils.escapeHtml(item.name) + '</span>' +
+            '<select data-action="status" data-id="' + id + '">' +
+              '<option value="open"' + (done ? '' : ' selected') + '>进行中</option>' +
+              '<option value="done"' + (done ? ' selected' : '') + '>已完成</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="meta">📍 ' + utils.escapeHtml(item.place) + '<br>🕒 ' + utils.escapeHtml(item.time) + '</div>' +
+          '<div class="acts">' +
+            '<span data-action="detail" data-id="' + id + '">查看</span>' +
+            '<span data-action="edit" data-id="' + id + '">编辑</span>' +
+            '<span class="danger" data-action="remove" data-id="' + id + '">删除</span>' +
+          '</div>' +
+        '</div>';
+    }).join('');
+
+    return '' +
+      '<div class="mine-head">' +
+        '<div class="avatar">' + utils.escapeHtml(me.name.charAt(0)) + '</div>' +
+        '<div>' +
+          '<div class="nm">' + utils.escapeHtml(me.name) + '</div>' +
+          '<div class="sub">' + utils.escapeHtml(me.dept) + ' · 我的发布（' + list.length + '）</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="list" style="margin-top:12px">' + (items || empty('你还没有发布过信息')) + '</div>';
+  }
+
   /* ================= 路由 ================= */
 
   const PAGES = {
@@ -267,7 +317,8 @@
     publish: renderPublish,
     success: renderSuccess,
     search: renderSearch,
-    detail: renderDetail
+    detail: renderDetail,
+    mine: renderMine
   };
 
   function navigate(entry, push) {
@@ -327,6 +378,15 @@
     if (action === 's-filter') { setSFilter(type); return; }
     if (action === 'contact') { revealContact(); return; }
     if (action === 'report') { toast('已提交举报，等待管理员处理'); return; }
+    if (action === 'edit') { go('publish', { editId: el.getAttribute('data-id') }); return; }
+    if (action === 'remove') { removeItem(el.getAttribute('data-id')); return; }
+  }
+
+  /** 下拉框切换状态 */
+  function handleChange(e) {
+    const el = e.target;
+    if (!el || !el.getAttribute || el.getAttribute('data-action') !== 'status') return;
+    changeStatus(el.getAttribute('data-id'), el.value);
   }
 
   /** 输入时清掉该字段的错误提示；搜索框则实时检索 */
@@ -388,7 +448,7 @@
     }
   }
 
-  /** 提交发布 */
+  /** 提交发布／保存编辑 */
   function submitPublish() {
     const draft = readDraft();
     const result = LF.validate.validateDraft(draft);
@@ -397,7 +457,19 @@
       toast('还有信息没填好，请检查标红的字段');
       return;
     }
-    const item = store.add(LF.validate.normalizeDraft(draft));
+    const clean = LF.validate.normalizeDraft(draft);
+
+    if (state.editId) {
+      const id = state.editId;
+      store.update(id, clean);
+      state.editId = '';
+      toast('修改已保存');
+      state.nav = [];
+      navigate({ route: 'mine' }, false);
+      return;
+    }
+
+    const item = store.add(clean);
     state.lastPublishedId = item.id;
     go('success');
   }
@@ -462,11 +534,31 @@
     toast('已显示联系方式，请核验身份，谨防冒领');
   }
 
+  /* ================= 我的发布逻辑 ================= */
+
+  /** 修改信息状态：open 进行中 / done 已完成 */
+  function changeStatus(id, status) {
+    const item = store.setStatus(id, status);
+    if (!item) return;
+    toast(item.status === 'done' ? '已标记为「已完成」' : '已恢复为「进行中」');
+  }
+
+  /** 删除信息（二次确认） */
+  function removeItem(id) {
+    const item = store.get(id);
+    if (!item) return;
+    if (!window.confirm('确定删除「' + item.name + '」吗？删除后不可恢复。')) return;
+    store.remove(id);
+    toast('已删除该信息');
+    render();
+  }
+
   /* ================= 初始化 ================= */
 
   function init() {
     document.addEventListener('click', handleClick);
     document.addEventListener('input', handleInput);
+    document.addEventListener('change', handleChange);
     render();
   }
 

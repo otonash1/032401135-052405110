@@ -260,6 +260,7 @@
     const tagText = isLost ? '寻物' : '招领';
 
     return '' +
+      navbar('信息详情') +
       '<div class="detail-hero">' + cateIcon(item) + '</div>' +
       '<div class="detail-card">' +
         '<div class="name-row">' +

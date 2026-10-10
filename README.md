@@ -40,6 +40,8 @@ lost-found-app/
 │   ├── validate.test.js    validate 单元测试
 │   ├── search.test.js      search 单元测试
 │   └── store.test.js       store 单元测试
+├── diagrams/               关键实现的流程图 / 数据流图（交付文档配图）
+├── shots/                  界面截图（交付文档配图）
 └── README.md               目录说明与使用说明
 ```
 

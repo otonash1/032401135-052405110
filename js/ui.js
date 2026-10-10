@@ -213,13 +213,61 @@
       '</div>';
   }
 
+  /* ================= 页面：详情 ================= */
+
+  function renderDetail() {
+    const item = store.get(state.params.id);
+    if (!item) {
+      return navbar('信息详情') + empty('这条信息可能已经被删除或不见了');
+    }
+
+    const isLost = item.type === 'lost';
+    const done = item.status === 'done';
+    const tagText = isLost ? '寻物' : '招领';
+
+    return '' +
+      '<div class="detail-hero">' + cateIcon(item) + '</div>' +
+      '<div class="detail-card">' +
+        '<div class="name-row">' +
+          '<span class="name">' + utils.escapeHtml(item.name) + '</span>' +
+          '<span class="tag ' + item.type + '">' + tagText + '</span>' +
+          '<span class="status' + (done ? ' done' : '') + '">' + (done ? '已完成' : '进行中') + '</span>' +
+        '</div>' +
+        '<div class="desc">' + utils.escapeHtml(item.desc) + '</div>' +
+      '</div>' +
+      '<div class="rows">' +
+        '<div class="r"><span class="k">' + (isLost ? '丢失地点' : '拾获地点') + '</span><span class="v">' + utils.escapeHtml(item.place) + '</span></div>' +
+        '<div class="r"><span class="k">' + (isLost ? '丢失时间' : '拾获时间') + '</span><span class="v">' + utils.escapeHtml(item.time) + '</span></div>' +
+        '<div class="r"><span class="k">物品类别</span><span class="v">' + utils.escapeHtml(item.cate) + '</span></div>' +
+        '<div class="r"><span class="k">信息编号</span><span class="v">' + utils.escapeHtml(item.id) + '</span></div>' +
+      '</div>' +
+      '<div class="publisher">' +
+        '<div class="avatar">' + utils.escapeHtml(String(item.pub).charAt(0)) + '</div>' +
+        '<div class="pu-info">' +
+          '<div class="pu-name">' + utils.escapeHtml(item.pub) + '</div>' +
+          '<div class="pu-sub">' + utils.escapeHtml(item.dept) + ' · ' + utils.formatPubTime(item.createdAt) + '</div>' +
+        '</div>' +
+        '<button class="contact-btn" data-action="contact" id="contact-toggle">联系 TA</button>' +
+      '</div>' +
+      '<div class="contact-box" id="contact-box" style="display:none">' +
+        '<div class="c-label">发布者联系方式</div>' +
+        '<div class="c-row"><span class="c-value">' + utils.escapeHtml(item.contact) + '</span></div>' +
+      '</div>' +
+      '<div class="notice">为保护同学隐私，联系方式默认隐藏，点击「联系 TA」后显示；请勿在公开评论中留下个人信息，谨防冒领与诈骗。</div>' +
+      '<div class="detail-actions">' +
+        '<button class="btn btn-ghost" data-action="report">举报</button>' +
+        '<button class="btn btn-main" data-action="contact">查看联系方式</button>' +
+      '</div>';
+  }
+
   /* ================= 路由 ================= */
 
   const PAGES = {
     home: renderHome,
     publish: renderPublish,
     success: renderSuccess,
-    search: renderSearch
+    search: renderSearch,
+    detail: renderDetail
   };
 
   function navigate(entry, push) {
@@ -277,6 +325,8 @@
     if (action === 'success-again') { go('publish', { type: state.publishType }); return; }
     if (action === 'quick-kw') { quickKw(el.getAttribute('data-kw')); return; }
     if (action === 's-filter') { setSFilter(type); return; }
+    if (action === 'contact') { revealContact(); return; }
+    if (action === 'report') { toast('已提交举报，等待管理员处理'); return; }
   }
 
   /** 输入时清掉该字段的错误提示；搜索框则实时检索 */
@@ -398,6 +448,18 @@
       chips[i].classList.toggle('on', chips[i].getAttribute('data-type') === filter);
     }
     doSearch();
+  }
+
+  /* ================= 详情逻辑 ================= */
+
+  /** 展开联系方式（默认隐藏，点击后显示） */
+  function revealContact() {
+    const box = $('contact-box');
+    if (!box) return;
+    box.style.display = 'block';
+    const btn = $('contact-toggle');
+    if (btn) btn.textContent = '已显示';
+    toast('已显示联系方式，请核验身份，谨防冒领');
   }
 
   /* ================= 初始化 ================= */

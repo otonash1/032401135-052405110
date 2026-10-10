@@ -28,6 +28,7 @@
     params: {},           /* 当前页面参数（如详情页的 id） */
     nav: [],              /* 历史栈，供返回使用 */
     homeType: 'all',      /* 首页类型筛选：all / lost / found */
+    homeCate: 'all',      /* 首页类别筛选：all 或具体类别名 */
     publishType: 'lost',  /* 发布表单当前选中的类型 */
     editId: '',           /* 编辑模式下的信息编号（空表示新建） */
     lastPublishedId: '',  /* 刚发布成功的信息编号，供成功页跳详情 */
@@ -90,12 +91,32 @@
   /* ================= 页面：首页 ================= */
 
   function renderHome() {
+    const all = store.list();
+
     const chips = [['all', '全部'], ['lost', '寻物'], ['found', '招领']].map(function (pair) {
       const on = state.homeType === pair[0];
       return '<div class="chip' + (on ? ' on' : '') + '" data-action="home-type" data-type="' + pair[0] + '">' + pair[1] + '</div>';
     }).join('');
 
-    let list = search.filterByType(store.list(), state.homeType);
+    /* 类别筛选：全部 + 各物品类别 */
+    const cateChips = ['全部'].concat(seed.CATEGORIES).map(function (c) {
+      const val = c === '全部' ? 'all' : c;
+      const on = state.homeCate === val;
+      return '<div class="chip' + (on ? ' on' : '') + '" data-action="home-cate" data-cate="' + utils.escapeHtml(val) + '">' + utils.escapeHtml(c) + '</div>';
+    }).join('');
+
+    /* 概览统计：全部 / 寻物 / 招领 条数 */
+    const lostCount = search.filterByType(all, 'lost').length;
+    const foundCount = search.filterByType(all, 'found').length;
+    const stats = '' +
+      '<div class="stats">' +
+        '<div class="s"><div class="n">' + all.length + '</div><div class="l">全部信息</div></div>' +
+        '<div class="s"><div class="n">' + lostCount + '</div><div class="l">寻物</div></div>' +
+        '<div class="s"><div class="n">' + foundCount + '</div><div class="l">招领</div></div>' +
+      '</div>';
+
+    let list = search.filterByType(all, state.homeType);
+    list = search.filterByCategory(list, state.homeCate);
     list = search.sortByTimeDesc(list);
 
     return '' +
@@ -109,7 +130,9 @@
         '<div class="split"></div>' +
         '<div class="q" data-action="publish" data-type="found"><div class="ico">🙌</div><div class="t">发布招领</div><div class="d">我捡到东西</div></div>' +
       '</div>' +
+      stats +
       '<div class="filter">' + chips + '</div>' +
+      '<div class="filter">' + cateChips + '</div>' +
       '<div class="list">' + (list.map(itemCard).join('') || empty('暂时还没有信息')) + '</div>';
   }
 
@@ -262,7 +285,10 @@
       '</div>' +
       '<div class="contact-box" id="contact-box" style="display:none">' +
         '<div class="c-label">发布者联系方式</div>' +
-        '<div class="c-row"><span class="c-value">' + utils.escapeHtml(item.contact) + '</span></div>' +
+        '<div class="c-row">' +
+          '<span class="c-value" id="contact-value">' + utils.escapeHtml(item.contact) + '</span>' +
+          '<button class="copy-btn" data-action="copy">复制</button>' +
+        '</div>' +
       '</div>' +
       '<div class="notice">为保护同学隐私，联系方式默认隐藏，点击「联系 TA」后显示；请勿在公开评论中留下个人信息，谨防冒领与诈骗。</div>' +
       '<div class="detail-actions">' +
@@ -370,6 +396,7 @@
     if (action === 'publish') { go('publish', { type: type }); return; }
     if (action === 'detail') { go('detail', { id: el.getAttribute('data-id') }); return; }
     if (action === 'home-type') { state.homeType = type; render(); return; }
+    if (action === 'home-cate') { state.homeCate = el.getAttribute('data-cate'); render(); return; }
     if (action === 'seg') { setPublishType(type); return; }
     if (action === 'submit') { submitPublish(); return; }
     if (action === 'success-detail') { go('detail', { id: state.lastPublishedId }); return; }
@@ -377,6 +404,7 @@
     if (action === 'quick-kw') { quickKw(el.getAttribute('data-kw')); return; }
     if (action === 's-filter') { setSFilter(type); return; }
     if (action === 'contact') { revealContact(); return; }
+    if (action === 'copy') { copyContact(); return; }
     if (action === 'report') { toast('已提交举报，等待管理员处理'); return; }
     if (action === 'edit') { go('publish', { editId: el.getAttribute('data-id') }); return; }
     if (action === 'remove') { removeItem(el.getAttribute('data-id')); return; }
@@ -532,6 +560,33 @@
     const btn = $('contact-toggle');
     if (btn) btn.textContent = '已显示';
     toast('已显示联系方式，请核验身份，谨防冒领');
+  }
+
+  /** 一键复制联系方式：优先用剪贴板 API，不可用时回退到临时输入框 */
+  function copyContact() {
+    const el = $('contact-value');
+    const text = el ? el.textContent : '';
+    if (!text) return;
+
+    const done = function () { toast('联系方式已复制：' + text); };
+    const fallback = function () {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      toast(ok ? '联系方式已复制：' + text : '复制失败，请手动长按选择');
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else {
+      fallback();
+    }
   }
 
   /* ================= 我的发布逻辑 ================= */

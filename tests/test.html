@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校园失物招领 · 单元测试</title>
+<style>
+  :root { --pass: #14b8a6; --fail: #ef4444; --line: #e6e8ee; --text: #1f2430; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: #f4f6fb; color: var(--text);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #6b7280; font-size: 13px; margin-bottom: 16px; }
+  .summary {
+    display: flex; gap: 12px; align-items: center; padding: 16px 20px;
+    border-radius: 14px; background: #fff; box-shadow: 0 2px 12px rgba(20,30,60,.06);
+    margin-bottom: 16px;
+  }
+  .summary .big { font-size: 28px; font-weight: 700; }
+  .summary.ok .big { color: var(--pass); }
+  .summary.bad .big { color: var(--fail); }
+  .summary .muted { color: #6b7280; font-size: 13px; }
+  ol { list-style: none; margin: 0; padding: 0; }
+  li {
+    display: flex; gap: 10px; padding: 10px 14px; background: #fff;
+    border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px;
+    font-size: 14px; line-height: 1.5;
+  }
+  li .mark { flex: 0 0 18px; font-weight: 700; }
+  li.pass .mark { color: var(--pass); }
+  li.fail { border-color: #fbcaca; background: #fff7f7; }
+  li.fail .mark { color: var(--fail); }
+  li .msg { color: var(--fail); font-size: 12px; margin-top: 4px; }
+  .group-title { font-size: 13px; color: #6b7280; margin: 18px 0 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>校园失物招领 · 单元测试</h1>
+  <p class="sub">
+    纯逻辑模块（utils / validate / search / store）的测试，无需 Node.js，双击本文件即可运行。
+  </p>
+  <div id="summary" class="summary"><div class="big">…</div><div class="muted">正在执行用例</div></div>
+  <ol id="list"></ol>
+</div>
+
+<!-- 被测代码：顺序即依赖顺序 -->
+<script src="../js/utils.js"></script>
+<script src="../js/seed.js"></script>
+<script src="../js/validate.js"></script>
+<script src="../js/search.js"></script>
+<script src="../js/store.js"></script>
+
+<!-- 极简测试框架 + 用例 -->
+<script src="harness.js"></script>
+<script src="utils.test.js"></script>
+<script src="validate.test.js"></script>
+<script src="search.test.js"></script>
+<script src="store.test.js"></script>
+
+<!-- 执行并渲染结果 -->
+<script>
+(function () {
+  'use strict';
+  var result = window.LF.runTests('校园失物招领 · 单元测试');
+
+  var summary = document.getElementById('summary');
+  summary.className = 'summary ' + (result.fail === 0 ? 'ok' : 'bad');
+  summary.innerHTML =
+    '<div class="big">' + result.pass + ' / ' + result.total + '</div>' +
+    '<div class="muted">' +
+      (result.fail === 0 ? '全部用例通过 🎉' : '有 ' + result.fail + ' 个用例失败') +
+      '<br>绿色=通过，红色=失败</div>';
+
+  var list = document.getElementById('list');
+  result.details.forEach(function (item) {
+    var li = document.createElement('li');
+    li.className = item.ok ? 'pass' : 'fail';
+    li.innerHTML =
+      '<span class="mark">' + (item.ok ? '✓' : '✗') + '</span>' +
+      '<span>' + item.index + '. ' + item.name +
+      (item.ok ? '' : '<div class="msg">' + item.message + '</div>') +
+      '</span>';
+    list.appendChild(li);
+  });
+
+  document.title = (result.fail === 0 ? '✓ ' : '✗ ') + '校园失物招领 · 单元测试';
+})();
+</script>
+</body>
+</html>
